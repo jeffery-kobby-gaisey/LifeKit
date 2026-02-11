@@ -203,8 +203,32 @@ export default function TasksPage() {
   const overdueTasks = tasks.filter(
     (t) => !t.completed && isOverdue(t.dueDate)
   )
+  
+  // This week tasks (next 6 days after today)
+  const thisWeekEnd = new Date(today)
+  thisWeekEnd.setDate(thisWeekEnd.getDate() + 6)
+  const thisWeekTasks = tasks.filter(
+    (t) => {
+      const taskDate = new Date(t.dueDate)
+      taskDate.setHours(0, 0, 0, 0)
+      return !t.completed && taskDate > today && taskDate <= thisWeekEnd
+    }
+  )
+  
+  // Group this week tasks by day
+  const thisWeekByDay = new Map<string, Task[]>()
+  thisWeekTasks.forEach((task) => {
+    const taskDate = new Date(task.dueDate)
+    taskDate.setHours(0, 0, 0, 0)
+    const dateKey = taskDate.toISOString().split('T')[0]
+    if (!thisWeekByDay.has(dateKey)) {
+      thisWeekByDay.set(dateKey, [])
+    }
+    thisWeekByDay.get(dateKey)!.push(task)
+  })
+  
   const otherTasks = tasks.filter(
-    (t) => !t.completed && !isToday(t.dueDate) && !isOverdue(t.dueDate)
+    (t) => !t.completed && !isToday(t.dueDate) && !isOverdue(t.dueDate) && !thisWeekTasks.includes(t)
   )
   const completedTasks = tasks.filter((t) => t.completed)
 
@@ -305,11 +329,56 @@ export default function TasksPage() {
           </div>
         )}
 
-        {/* Upcoming */}
+        {/* This Week */}
+        {thisWeekTasks.length > 0 && (
+          <div>
+            <h2 className="font-bold text-blue-600 mb-3 text-sm flex items-center gap-2">
+              <span>📅 THIS WEEK ({thisWeekTasks.length})</span>
+            </h2>
+            <div className="space-y-3 border-l-4 border-blue-300 pl-3">
+              {Array.from(thisWeekByDay.entries()).map(([dateKey, dayTasks]) => {
+                const date = new Date(dateKey + 'T00:00:00')
+                const dayName = date.toLocaleDateString('en-US', { weekday: 'short' })
+                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                return (
+                  <div key={dateKey}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="font-semibold text-sm text-gray-700 bg-blue-50 px-2 py-1 rounded">
+                        {dayName} · {dateStr}
+                      </div>
+                      <span className="text-xs text-gray-500">({dayTasks.length})</span>
+                    </div>
+                    <div className="space-y-2 ml-0">
+                      {dayTasks.map((task) => (
+                        <TaskItem
+                          key={task.id}
+                          task={task}
+                          isOverdue={false}
+                          isEditing={editingId === task.id}
+                          editingTitle={editingTitle}
+                          editingReminderTime={editingReminderTime}
+                          onEditReminderChange={setEditingReminderTime}
+                          onEditChange={setEditingTitle}
+                          onToggle={handleToggleTask}
+                          onDelete={handleDeleteTask}
+                          onEdit={handleStartEdit}
+                          onSaveEdit={handleSaveEdit}
+                          onCancelEdit={handleCancelEdit}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Later (Beyond this week) */}
         {otherTasks.length > 0 && (
           <div>
             <h2 className="font-bold text-gray-500 mb-2 text-sm">
-              📆 UPCOMING ({otherTasks.length})
+              📆 LATER ({otherTasks.length})
             </h2>
             <div className="space-y-2">
               {otherTasks.map((task) => (
